@@ -1474,3 +1474,7 @@ export function getPostBySlug(slug: string): Post | undefined {
 export function getPostsByCategory(category: string): Post[] {
   return posts.filter(post => post.category === category);
 }
+
+export function readingTime(content: string) {
+  return Math.max(1, Math.ceil(content.replace(/\s/g, '').length / 500));
+}

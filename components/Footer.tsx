@@ -1,11 +1,2 @@
-export default function Footer() {
-  return (
-    <footer className="border-t border-gray-200 bg-white mt-auto">
-      <div className="mx-auto max-w-4xl px-4 py-6">
-        <p className="text-center text-sm text-gray-600">
-          © {new Date().getFullYear()} Woke Soul. 一片流动盛宴，一个充满爱与善良的博客
-        </p>
-      </div>
-    </footer>
-  );
-}
+import Link from 'next/link';
+export default function Footer() { return <footer className="site-footer"><p>Copyright © {new Date().getFullYear()} <Link href="/">流动盛宴</Link>. All rights reserved.</p></footer>; }

@@ -1,29 +1,21 @@
 import Link from 'next/link';
 
+const links = [
+  { href: '/', label: '首页' },
+  { href: '/blog', label: '文章列表' },
+  { href: '/guestbook', label: '留言板' },
+  { href: '/about', label: '关于' },
+];
+
 export default function Header() {
   return (
-    <header className="border-b border-gray-200 bg-white">
-      <div className="mx-auto max-w-4xl px-4">
-        <div className="flex h-16 items-center justify-between">
-          <Link href="/" className="text-xl font-bold text-gray-900">
-            流动盛宴
-          </Link>
-          <nav className="flex gap-6">
-            <Link href="/" className="text-gray-600 hover:text-gray-900">
-              首页
-            </Link>
-            <Link href="/blog" className="text-gray-600 hover:text-gray-900">
-              文章列表
-            </Link>
-            <Link href="/guestbook" className="text-gray-600 hover:text-gray-900">
-              留言板
-            </Link>
-            <Link href="/about" className="text-gray-600 hover:text-gray-900">
-              关于
-            </Link>
-          </nav>
-        </div>
-      </div>
-    </header>
+    <>
+      <div className="utility-nav"><nav aria-label="快捷导航" className="site-width">{links.map((link) => <Link key={link.href} href={link.href}>{link.label}</Link>)}</nav></div>
+      <header className="site-header">
+        <Link href="/" className="site-title">流动盛宴</Link>
+        <p>市场的潮汐，技术的火光，与文字的远方</p>
+        <nav aria-label="主导航" className="main-nav">{links.map((link) => <Link key={link.href} href={link.href}>{link.label}</Link>)}</nav>
+      </header>
+    </>
   );
 }
