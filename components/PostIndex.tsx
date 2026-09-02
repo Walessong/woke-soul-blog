@@ -2,17 +2,19 @@
 
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
-import { readingTime, tagsForPost, type Post } from '@/lib/posts';
+import type { Post } from '@/lib/posts';
+
+const readingTime = (content: string) => Math.max(1, Math.ceil(content.replace(/\s/g, '').length / 500));
 
 export default function PostIndex({ posts }: { posts: Post[] }) {
   const [category, setCategory] = useState('全部');
   const [tag, setTag] = useState('全部');
   const [query, setQuery] = useState('');
   const categories = ['全部', ...Array.from(new Set(posts.map((post) => post.category)))];
-  const tags = ['全部', ...Array.from(new Set(posts.flatMap(tagsForPost)))];
+  const tags = ['全部', ...Array.from(new Set(posts.flatMap((post) => post.tags)))];
   const visiblePosts = useMemo(() => posts.filter((post) => {
     const matchesCategory = category === '全部' || post.category === category;
-    const matchesTag = tag === '全部' || tagsForPost(post).includes(tag);
+    const matchesTag = tag === '全部' || post.tags.includes(tag);
     return matchesCategory && matchesTag && `${post.title} ${post.excerpt} ${post.content}`.toLowerCase().includes(query.trim().toLowerCase());
   }), [category, posts, query, tag]);
 
@@ -30,7 +32,7 @@ export default function PostIndex({ posts }: { posts: Post[] }) {
         <div className="post-meta"><span>{post.category}</span><i /><time>{post.date}</time><b>{readingTime(post.content)} 分钟</b></div>
         <h2><Link href={`/posts/${post.slug}`}>{post.title}</Link></h2>
         <p>{post.excerpt}</p>
-        <div className="post-tags">{tagsForPost(post).map((item) => <button key={item} onClick={() => setTag(item)}>#{item}</button>)}</div>
+        <div className="post-tags">{post.tags.map((item) => <button key={item} onClick={() => setTag(item)}>#{item}</button>)}</div>
         <Link className="read-more" href={`/posts/${post.slug}`}>阅读更多</Link>
       </article>)}
     </div>
