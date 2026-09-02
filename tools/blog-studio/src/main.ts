@@ -35,7 +35,13 @@ async function validRepo(config: StudioConfig) {
 }
 async function run(command: string, args: string[], cwd?: string) {
   const executable = process.platform === 'win32' && command === 'npx' ? 'npx.cmd' : command;
-  return execFileAsync(executable, args, { cwd, windowsHide: true, maxBuffer: 2 * 1024 * 1024, timeout: 60_000 });
+  try {
+    return await execFileAsync(executable, args, { cwd, windowsHide: true, maxBuffer: 2 * 1024 * 1024, timeout: 60_000 });
+  } catch (error) {
+    const failure = error as Error & { stdout?: string; stderr?: string; killed?: boolean };
+    const detail = [failure.killed ? '命令超时（60 秒）。' : failure.message, failure.stderr?.trim(), failure.stdout?.trim()].filter(Boolean).join('\n');
+    throw new Error(detail);
+  }
 }
 function frontValue(source: string, key: string) {
   const match = source.match(new RegExp(`^${key}:\\s*[\"']?(.+?)[\"']?\\s*$`, 'm'));
@@ -148,9 +154,14 @@ async function publish(config: StudioConfig, filename: string, images: string[],
     if (alreadyStaged.trim()) throw new Error('Git 暂存区已有改动。请先在 Git 中处理这些改动后再发布。');
     await logRun('暂存当前文章和导入图片…', 'git', ['add', '--', relativePost, ...relativeImages]);
     const { stdout: staged } = await run('git', ['diff', '--cached', '--name-only'], config.repoPath);
-    if (!staged.split(/\r?\n/).filter(Boolean).every((file) => file === relativePost || relativeImages.includes(file))) throw new Error('暂存区含有非本次发布文件，请先清理后重试。');
+    const stagedFiles = staged.split(/\r?\n/).filter(Boolean);
+    if (!stagedFiles.every((file) => file === relativePost || relativeImages.includes(file))) throw new Error('暂存区含有非本次发布文件，请先清理后重试。');
     const post = (await allPosts(config)).find((item) => item.filename === filename);
     if (!post) throw new Error('找不到待发布文章。');
+    if (!stagedFiles.length) {
+      addLog('没有检测到待提交的文章改动，无需重复发布。');
+      return { ok: true, message: '文章已是最新版本，无需重复发布。', url: `${config.productionUrl}/posts/${post.slug}`, logs };
+    }
     await logRun('创建 Git 提交…', 'git', ['commit', '-m', `Publish: ${post.title}`]);
     const { stdout: sha } = await run('git', ['rev-parse', 'HEAD'], config.repoPath);
     await logRun('推送到 GitHub…', 'git', ['push', 'origin', config.branch]);
@@ -159,7 +170,7 @@ async function publish(config: StudioConfig, filename: string, images: string[],
     while (Date.now() - started < 10 * 60 * 1000) {
       try {
         const deployment = await deploymentForCommit(config, sha.trim());
-        if (deployment.ready) return { ok: true, commit: sha.trim(), url: `${config.productionUrl}/posts/${post.slug}`, logs };
+        if (deployment.ready) return { ok: true, message: '发布完成。', commit: sha.trim(), url: `${config.productionUrl}/posts/${post.slug}`, logs };
       } catch (error) { addLog(`部署查询重试：${error instanceof Error ? error.message : String(error)}`); }
       await new Promise((resolve) => setTimeout(resolve, 10000));
     }

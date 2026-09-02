@@ -26,6 +26,7 @@ export interface EnvironmentStatus {
 
 export interface PublishResult {
   ok: boolean;
+  message?: string;
   commit?: string;
   url?: string;
   logs: string[];

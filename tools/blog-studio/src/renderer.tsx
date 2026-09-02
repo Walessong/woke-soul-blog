@@ -48,7 +48,7 @@ function App() {
       const saved = await save(false);
       if (!saved) return;
       const result = await window.studio.publish(saved.filename, importedImages);
-      setPublishResult(result); setNotice(result.ok ? '发布完成。' : '发布未完成，文章仍保留在本地。');
+      setPublishResult(result); setNotice(result.message ?? (result.ok ? '发布完成。' : '发布未完成，文章仍保留在本地。'));
       if (result.ok) { setImportedImages([]); setPosts(await window.studio.posts.list()); }
     } catch (error) { setPublishResult({ ok: false, logs: [], error: error instanceof Error ? error.message : String(error) }); }
     finally { setPublishing(false); }
