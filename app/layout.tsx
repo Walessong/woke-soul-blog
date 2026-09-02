@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Woke Soul — 新的原野",
-  description: "一片新的原野，一个充满爱与善良的博客",
+  title: "Woke Soul — 流动盛宴",
+  description: "一片流动盛宴，一个充满爱与善良的博客",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

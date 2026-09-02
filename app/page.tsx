@@ -7,10 +7,10 @@ export default function Home() {
       <div className="max-w-3xl mx-auto px-6 py-12">
         <div className="mb-12 text-center">
           <h1 className="text-4xl font-bold text-zinc-900 dark:text-zinc-50 mb-4">
-            新的原野
+            流动盛宴
           </h1>
           <p className="text-lg text-zinc-600 dark:text-zinc-400">
-            一片新的原野，一个充满爱与善良的博客
+            一片流动盛宴，一个充满爱与善良的博客
           </p>
         </div>
 

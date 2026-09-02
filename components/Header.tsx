@@ -6,7 +6,7 @@ export default function Header() {
       <div className="mx-auto max-w-4xl px-4">
         <div className="flex h-16 items-center justify-between">
           <Link href="/" className="text-xl font-bold text-gray-900">
-            新的原野
+            流动盛宴
           </Link>
           <nav className="flex gap-6">
             <Link href="/" className="text-gray-600 hover:text-gray-900">
