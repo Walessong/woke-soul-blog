@@ -17,13 +17,15 @@ export default async function PostPage({ params }: { params: Promise<{ slug: str
   const newer = posts[index - 1];
   const older = posts[index + 1];
 
-  return <article className="article-shell">
-    <Link href="/" className="back-link">返回首页</Link>
+  return <article className="article-shell site-width">
+    <nav className="breadcrumb" aria-label="面包屑导航"><Link href="/">首页</Link><span>›</span><span>{post.title}</span></nav>
     <header className="article-header">
-      <div className="post-meta"><span>{post.category}</span><i /><time>{post.date}</time><b>{readingTime(post.content)} 分钟</b></div>
+      <div className="post-category">{post.category}</div>
       <h1>{post.title}</h1>
+      <div className="post-meta post-byline"><span>Woke Soul</span><i /><time>{post.date}</time><b>{readingTime(post.content)} 分钟</b></div>
     </header>
     <div className="article-content"><ReactMarkdown remarkPlugins={[remarkGfm]}>{post.content}</ReactMarkdown></div>
+    <footer className="article-footer">分类：<Link href={`/blog?q=${encodeURIComponent(post.category)}`}>{post.category}</Link></footer>
     <Comments />
     <nav className="post-nav" aria-label="文章导航">
       {newer ? <Link href={`/posts/${newer.slug}`}><span>较新文章</span>{newer.title}</Link> : <span />}
