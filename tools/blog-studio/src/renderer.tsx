@@ -19,6 +19,7 @@ function App() {
   const [notice, setNotice] = useState('');
   const [publishing, setPublishing] = useState(false);
   const [publishResult, setPublishResult] = useState<PublishResult>();
+  const [publishLogs, setPublishLogs] = useState<string[]>([]);
   const [importedImages, setImportedImages] = useState<string[]>([]);
   const textarea = useRef<HTMLTextAreaElement>(null);
 
@@ -28,6 +29,7 @@ function App() {
     if (status.validRepo) setPosts(await window.studio.posts.list());
   };
   useEffect(() => { void load(); }, []);
+  useEffect(() => window.studio.onPublishLog((message) => setPublishLogs((current) => [...current.slice(-99), message])), []);
   const categories = useMemo(() => Array.from(new Set([...Object.keys(seriesFor), ...posts.map((item) => item.category).filter(Boolean)])).sort(), [posts]);
   const visiblePosts = posts.filter((item) => `${item.title} ${item.tags.join(' ')} ${item.category}`.toLowerCase().includes(search.toLowerCase()));
   const update = (values: Partial<StudioPost>) => setPost((current) => current ? { ...current, ...values } : current);
@@ -41,7 +43,7 @@ function App() {
   };
   const publish = async () => {
     if (!post || publishing) return;
-    setPublishing(true); setPublishResult(undefined); setNotice('保存并开始发布…');
+    setPublishing(true); setPublishResult(undefined); setPublishLogs([]); setNotice('保存并开始发布…');
     try {
       const saved = await save(false);
       if (!saved) return;
@@ -80,7 +82,7 @@ function App() {
       <div className="article-list">{visiblePosts.map((item) => <button key={item.filename} className={post?.filename === item.filename ? 'article-item active' : 'article-item'} onClick={() => openPost(item)}><span>{item.draft ? '草稿' : item.date}</span><strong>{item.title}</strong><small>{item.category || item.series || '未分类'}</small></button>)}</div>
       <div className="sidebar-bottom"><button className="text-button" onClick={chooseRepository}>切换博客仓库</button><small>{environment.git ? 'Git 已就绪' : '未检测到 Git'} · {environment.vercel ? 'Vercel 已登录' : 'Vercel 未登录'}</small></div>
     </aside>
-    {post ? <Editor post={post} categories={categories} update={update} save={save} publish={publish} remove={remove} importImages={importImages} textarea={textarea} publishing={publishing} notice={notice} result={publishResult} /> : <section className="empty-editor"><h1>开始写作</h1><p>从左侧选择一篇文章，或新建草稿。</p><button className="primary" onClick={createPost}>新建文章</button></section>}
+    {post ? <Editor post={post} categories={categories} update={update} save={save} publish={publish} remove={remove} importImages={importImages} textarea={textarea} publishing={publishing} notice={notice} result={publishResult} liveLogs={publishLogs} /> : <section className="empty-editor"><h1>开始写作</h1><p>从左侧选择一篇文章，或新建草稿。</p><button className="primary" onClick={createPost}>新建文章</button></section>}
   </main>;
 }
 
@@ -88,12 +90,12 @@ function Setup({ config, status, chooseRepository }: { config: StudioConfig; sta
   return <main className="setup"><div><span className="eyebrow">流动盛宴</span><h1>连接你的博客仓库</h1><p>写作台会直接读写本机 Markdown 文件，并复用你本机的 Git 与 Vercel 登录状态。不会保存 GitHub 或 Vercel Token。</p><div className="path">{config.repoPath}</div><button className="primary" onClick={chooseRepository}>选择博客仓库</button><ul><li className={status.git ? 'ok' : ''}>{status.git ? '已检测到 Git' : '未检测到 Git，请安装 Git for Windows。'}</li><li className={status.vercel ? 'ok' : ''}>{status.vercel ? 'Vercel 已登录' : '请在命令行运行 npx vercel login 后重试。'}</li><li>{status.message}</li></ul></div></main>;
 }
 
-function Editor({ post, categories, update, save, publish, remove, importImages, textarea, publishing, notice, result }: { post: StudioPost; categories: string[]; update(values: Partial<StudioPost>): void; save(draft?: boolean): Promise<StudioPost | undefined>; publish(): Promise<void>; remove(): Promise<void>; importImages(): Promise<void>; textarea: React.RefObject<HTMLTextAreaElement | null>; publishing: boolean; notice: string; result?: PublishResult }) {
+function Editor({ post, categories, update, save, publish, remove, importImages, textarea, publishing, notice, result, liveLogs }: { post: StudioPost; categories: string[]; update(values: Partial<StudioPost>): void; save(draft?: boolean): Promise<StudioPost | undefined>; publish(): Promise<void>; remove(): Promise<void>; importImages(): Promise<void>; textarea: React.RefObject<HTMLTextAreaElement | null>; publishing: boolean; notice: string; result?: PublishResult; liveLogs: string[] }) {
   return <section className="editor">
     <header className="editor-toolbar"><div><span className={post.draft ? 'status draft' : 'status published'}>{post.draft ? '草稿' : '待发布'}</span><span className="filename">{post.filename || '新文章'}</span></div><div className="toolbar-actions"><button className="text-button danger" disabled={!post.filename} onClick={() => void remove()}>删除</button><button className="secondary" onClick={() => void save()}>保存草稿</button><button className="primary" disabled={publishing} onClick={() => void publish()}>{publishing ? '正在发布…' : '发布'}</button></div></header>
     <div className="metadata"><label>标题<input value={post.title} onChange={(event) => update({ title: event.target.value })} placeholder="文章标题" autoFocus /></label><label>发布日期<input type="date" value={post.date} onChange={(event) => update({ date: event.target.value })} /></label><label>链接标识<input value={post.slug} onChange={(event) => update({ slug: event.target.value.toLowerCase().replace(/\s+/g, '-') })} placeholder="自动生成" /></label><label>分类<select value={post.category} onChange={(event) => update({ category: event.target.value, series: seriesFor[event.target.value] ?? post.series })}>{categories.map((category) => <option key={category}>{category}</option>)}</select></label><label>标签<input value={post.tags.join(', ')} onChange={(event) => update({ tags: event.target.value.split(',').map((tag) => tag.trim()).filter(Boolean) })} placeholder="用逗号分隔" /></label><label className="wide">摘要<input value={post.description} onChange={(event) => update({ description: event.target.value })} placeholder="首页展示的文章摘要" /></label></div>
     <div className="workspace"><div className="source-pane"><div className="pane-title"><span>Markdown</span><button className="text-button" onClick={() => void importImages()}>导入图片</button></div><textarea ref={textarea} value={post.content} onChange={(event) => update({ content: event.target.value })} placeholder="从这里开始写作…" spellCheck="false" /></div><article className="preview-pane"><div className="pane-title">预览</div><h1>{post.title || '未命名文章'}</h1><div className="preview-meta">{post.category || post.series} · {post.date}</div><ReactMarkdown remarkPlugins={[remarkGfm]}>{post.content || '正文预览会显示在这里。'}</ReactMarkdown></article></div>
-    {(notice || result) && <section className={result?.ok === false ? 'notice error' : 'notice'}><strong>{notice}</strong>{result?.error && <p>{result.error}</p>}{result?.logs.length ? <pre>{result.logs.join('\n')}</pre> : null}{result?.url && <button className="text-button" onClick={() => void window.studio.openExternal(result.url!)}>打开已发布文章</button>}</section>}
+    {(notice || result) && <section className={result?.ok === false ? 'notice error' : 'notice'}><strong>{notice}</strong>{result?.error && <p>{result.error}</p>}{(result?.logs.length ? result.logs : liveLogs).length ? <pre>{(result?.logs.length ? result.logs : liveLogs).join('\n')}</pre> : null}{result?.url && <button className="text-button" onClick={() => void window.studio.openExternal(result.url!)}>打开已发布文章</button>}</section>}
   </section>;
 }
 

@@ -35,7 +35,7 @@ async function validRepo(config: StudioConfig) {
 }
 async function run(command: string, args: string[], cwd?: string) {
   const executable = process.platform === 'win32' && command === 'npx' ? 'npx.cmd' : command;
-  return execFileAsync(executable, args, { cwd, windowsHide: true, maxBuffer: 2 * 1024 * 1024 });
+  return execFileAsync(executable, args, { cwd, windowsHide: true, maxBuffer: 2 * 1024 * 1024, timeout: 60_000 });
 }
 function frontValue(source: string, key: string) {
   const match = source.match(new RegExp(`^${key}:\\s*[\"']?(.+?)[\"']?\\s*$`, 'm'));
@@ -130,13 +130,14 @@ async function deploymentForCommit(config: StudioConfig, commit: string) {
   const url = stdout.match(/https:\/\/[^\s]+\.vercel\.app/)?.[0];
   return { ready: /Ready/i.test(stdout), url, raw: stdout };
 }
-async function publish(config: StudioConfig, filename: string, images: string[]): Promise<PublishResult> {
+async function publish(config: StudioConfig, filename: string, images: string[], onLog: (message: string) => void): Promise<PublishResult> {
   const logs: string[] = [];
+  const addLog = (message: string) => { logs.push(message); onLog(message); };
   const logRun = async (label: string, command: string, args: string[]) => {
-    logs.push(label);
+    addLog(label);
     const result = await run(command, args, config.repoPath);
-    if (result.stdout.trim()) logs.push(result.stdout.trim());
-    if (result.stderr.trim()) logs.push(result.stderr.trim());
+    if (result.stdout.trim()) addLog(result.stdout.trim());
+    if (result.stderr.trim()) addLog(result.stderr.trim());
     return result;
   };
   try {
@@ -153,18 +154,20 @@ async function publish(config: StudioConfig, filename: string, images: string[])
     await logRun('创建 Git 提交…', 'git', ['commit', '-m', `Publish: ${post.title}`]);
     const { stdout: sha } = await run('git', ['rev-parse', 'HEAD'], config.repoPath);
     await logRun('推送到 GitHub…', 'git', ['push', 'origin', config.branch]);
-    logs.push('等待 Vercel 部署完成…');
+    addLog('GitHub 推送成功，等待 Vercel 对应提交完成部署…');
     const started = Date.now();
     while (Date.now() - started < 10 * 60 * 1000) {
       try {
         const deployment = await deploymentForCommit(config, sha.trim());
         if (deployment.ready) return { ok: true, commit: sha.trim(), url: `${config.productionUrl}/posts/${post.slug}`, logs };
-      } catch (error) { logs.push(`部署查询重试：${error instanceof Error ? error.message : String(error)}`); }
+      } catch (error) { addLog(`部署查询重试：${error instanceof Error ? error.message : String(error)}`); }
       await new Promise((resolve) => setTimeout(resolve, 10000));
     }
     throw new Error('GitHub 已推送，但 Vercel 在 10 分钟内未报告部署完成。');
   } catch (error) {
-    return { ok: false, logs, error: error instanceof Error ? error.message : String(error) };
+    const message = error instanceof Error ? error.message : String(error);
+    addLog(`发布失败：${message}`);
+    return { ok: false, logs, error: message };
   }
 }
 
@@ -198,7 +201,7 @@ app.whenReady().then(() => {
     }
     return imported;
   });
-  ipcMain.handle('publish', async (_event, filename: string, images: string[]) => publish(await readConfig(), filename, images));
+  ipcMain.handle('publish', async (event, filename: string, images: string[]) => publish(await readConfig(), filename, images, (message) => event.sender.send('publish:log', message)));
   ipcMain.handle('openExternal', async (_event, url: string) => shell.openExternal(url));
   createWindow();
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });

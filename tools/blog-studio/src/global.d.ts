@@ -9,6 +9,7 @@ declare global {
       posts: { list(): Promise<StudioPost[]>; save(post: StudioPost): Promise<StudioPost>; delete(filename: string): Promise<void> };
       importImages(): Promise<string[]>;
       publish(filename: string, images: string[]): Promise<PublishResult>;
+      onPublishLog(callback: (message: string) => void): () => void;
       openExternal(url: string): Promise<void>;
     };
   }
