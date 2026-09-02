@@ -1478,3 +1478,14 @@ export function getPostsByCategory(category: string): Post[] {
 export function readingTime(content: string) {
   return Math.max(1, Math.ceil(content.replace(/\s/g, '').length / 500));
 }
+
+const categoryTags: Record<string, string[]> = {
+  'Markets & Quant': ['市场', '量化', '投资'],
+  'Tech & Engineering': ['技术', '工程', 'AI'],
+  'Aesthetics & Words': ['文艺', '思考'],
+  '导航': ['导航'],
+};
+
+export function tagsForPost(post: Post) {
+  return categoryTags[post.category] ?? [post.category];
+}
