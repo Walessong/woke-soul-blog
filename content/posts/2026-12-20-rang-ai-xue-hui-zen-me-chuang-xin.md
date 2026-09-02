@@ -1,13 +1,11 @@
 ---
 title: "让AI学会「怎么创新」：从科研经验归纳到创新算子"
-date: 2026-12-20T10:00:00+08:00
+date: "2026-08-20"
+slug: "rang-ai-xue-hui-zen-me-chuang-xin"
 categories: ["人工智能"]
 series: ["Tech & Engineering"]
-tags:
-  - "AI"
-  - "科研"
-  - "创新"
-  - "机器学习"
+tags: ["AI", "科研", "创新", "机器学习"]
+description: ""
 draft: false
 ---
 
