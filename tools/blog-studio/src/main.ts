@@ -33,10 +33,24 @@ async function exists(target: string) { try { await fs.access(target); return tr
 async function validRepo(config: StudioConfig) {
   return (await exists(postsPath(config))) && (await exists(path.join(config.repoPath, '.git'))) && (await exists(path.join(config.repoPath, 'package.json')));
 }
+async function systemNpx() {
+  const entries = (process.env.PATH ?? '').split(path.delimiter).filter(Boolean);
+  for (const directory of entries) {
+    if (directory.includes('node_modules')) continue;
+    const candidate = path.join(directory, 'npx.cmd');
+    if (await exists(candidate)) return candidate;
+  }
+  return 'npx';
+}
 async function run(command: string, args: string[], cwd?: string) {
-  const executable = process.platform === 'win32' && command === 'npx' ? 'npx.cmd' : command;
+  const throughCommandShell = process.platform === 'win32' && command === 'npx';
+  const executable = throughCommandShell ? (process.env.ComSpec ?? 'cmd.exe') : command;
+  const npx = throughCommandShell ? await systemNpx() : command;
+  const commandArgs = throughCommandShell
+    ? ['/d', '/s', '/c', [npx, ...args].map((value) => `"${value.replace(/"/g, '\\"')}"`).join(' ')]
+    : args;
   try {
-    return await execFileAsync(executable, args, { cwd, windowsHide: true, maxBuffer: 2 * 1024 * 1024, timeout: 60_000 });
+    return await execFileAsync(executable, commandArgs, { cwd, windowsHide: true, maxBuffer: 2 * 1024 * 1024, timeout: 60_000 });
   } catch (error) {
     const failure = error as Error & { stdout?: string; stderr?: string; killed?: boolean };
     const detail = [failure.killed ? '命令超时（60 秒）。' : failure.message, failure.stderr?.trim(), failure.stdout?.trim()].filter(Boolean).join('\n');
@@ -117,24 +131,28 @@ async function status(config: StudioConfig): Promise<EnvironmentStatus> {
   const test = async (command: string, args: string[], cwd?: string) => { try { await run(command, args, cwd); return true; } catch { return false; } };
   return { validRepo: repo, git: await test('git', ['--version']), vercel: await test('npx', ['vercel', 'whoami'], repo ? config.repoPath : undefined), message: repo ? undefined : '请选择包含 content/posts、.git 和 package.json 的博客仓库。' };
 }
-async function inspectProduction(config: StudioConfig) {
-  const { stdout } = await run('npx', ['vercel', 'inspect', config.productionUrl], config.repoPath);
-  const url = stdout.match(/url\s+https:\/\/([^\s]+)/i)?.[1];
-  const ready = /status\s+.*Ready/i.test(stdout);
-  return { ready, url: url ? `https://${url}` : config.productionUrl, raw: stdout };
-}
-async function deploymentForCommit(config: StudioConfig, commit: string) {
-  let projectName = '';
+async function deployCommittedRevision(config: StudioConfig, commit: string, addLog: (message: string) => void) {
+  const worktreePath = await fs.mkdtemp(path.join(app.getPath('temp'), 'woke-soul-blog-deploy-'));
+  await fs.rm(worktreePath, { recursive: true, force: true });
   try {
-    const project = JSON.parse(await fs.readFile(path.join(config.repoPath, '.vercel', 'project.json'), 'utf8')) as { projectName?: string };
-    projectName = project.projectName ?? '';
-  } catch { /* The linked project name is optional; Vercel can infer it from the repository. */ }
-  const args = ['vercel', 'ls'];
-  if (projectName) args.push(projectName);
-  args.push('--meta', `githubCommitSha=${commit}`);
-  const { stdout } = await run('npx', args, config.repoPath);
-  const url = stdout.match(/https:\/\/[^\s]+\.vercel\.app/)?.[0];
-  return { ready: /Ready/i.test(stdout), url, raw: stdout };
+    addLog('创建干净发布副本…');
+    await run('git', ['worktree', 'add', '--detach', worktreePath, commit], config.repoPath);
+    const linkedConfig = path.join(config.repoPath, '.vercel', 'project.json');
+    if (await exists(linkedConfig)) {
+      await fs.mkdir(path.join(worktreePath, '.vercel'), { recursive: true });
+      await fs.copyFile(linkedConfig, path.join(worktreePath, '.vercel', 'project.json'));
+    }
+    addLog('正在部署到 Vercel 生产环境…');
+    const result = await run('npx', ['vercel', 'deploy', '--prod', '--yes'], worktreePath);
+    const output = `${result.stdout}\n${result.stderr}`.trim();
+    if (output) addLog(output);
+    const deploymentUrl = output.match(/Production\s+(https:\/\/[^\s]+)/i)?.[1] ?? output.match(/https:\/\/[^\s]+\.vercel\.app/)?.[0];
+    if (!deploymentUrl) throw new Error('Vercel 未返回生产部署地址。');
+    return deploymentUrl;
+  } finally {
+    await run('git', ['worktree', 'remove', '--force', worktreePath], config.repoPath).catch(() => undefined);
+    await fs.rm(worktreePath, { recursive: true, force: true });
+  }
 }
 async function publish(config: StudioConfig, filename: string, images: string[], onLog: (message: string) => void): Promise<PublishResult> {
   const logs: string[] = [];
@@ -165,16 +183,9 @@ async function publish(config: StudioConfig, filename: string, images: string[],
     await logRun('创建 Git 提交…', 'git', ['commit', '-m', `Publish: ${post.title}`]);
     const { stdout: sha } = await run('git', ['rev-parse', 'HEAD'], config.repoPath);
     await logRun('推送到 GitHub…', 'git', ['push', 'origin', config.branch]);
-    addLog('GitHub 推送成功，等待 Vercel 对应提交完成部署…');
-    const started = Date.now();
-    while (Date.now() - started < 10 * 60 * 1000) {
-      try {
-        const deployment = await deploymentForCommit(config, sha.trim());
-        if (deployment.ready) return { ok: true, message: '发布完成。', commit: sha.trim(), url: `${config.productionUrl}/posts/${post.slug}`, logs };
-      } catch (error) { addLog(`部署查询重试：${error instanceof Error ? error.message : String(error)}`); }
-      await new Promise((resolve) => setTimeout(resolve, 10000));
-    }
-    throw new Error('GitHub 已推送，但 Vercel 在 10 分钟内未报告部署完成。');
+    addLog('GitHub 推送成功，开始部署刚提交的版本…');
+    await deployCommittedRevision(config, sha.trim(), addLog);
+    return { ok: true, message: '发布完成。', commit: sha.trim(), url: `${config.productionUrl}/posts/${post.slug}`, logs };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     addLog(`发布失败：${message}`);
