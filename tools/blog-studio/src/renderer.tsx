@@ -76,7 +76,7 @@ function App() {
   if (!environment.validRepo) return <Setup config={config} status={environment} chooseRepository={chooseRepository} />;
   return <main className="app-shell">
     <aside className="sidebar">
-      <div className="brand"><span>流动盛宴</span><strong>写作台</strong></div>
+      <div className="brand"><span>流动盛宴</span><strong>写作台 v0.1.1</strong></div>
       <button className="primary" onClick={createPost}>新建文章</button>
       <input className="library-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="搜索文章" aria-label="搜索文章" />
       <div className="article-list">{visiblePosts.map((item) => <button key={item.filename} className={post?.filename === item.filename ? 'article-item active' : 'article-item'} onClick={() => openPost(item)}><span>{item.draft ? '草稿' : item.date}</span><strong>{item.title}</strong><small>{item.category || item.series || '未分类'}</small></button>)}</div>
