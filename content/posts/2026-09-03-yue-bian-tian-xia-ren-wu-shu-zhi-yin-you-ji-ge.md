@@ -4,7 +4,7 @@ date: "2026-09-03"
 slug: "yue-bian-tian-xia-ren-wu-shu-zhi-yin-you-ji-ge"
 categories: ["阅读"]
 series: ["人文思考"]
-tags: ["遥远的救世主", "天幕红尘", "丁元英", "叶子农", "文学解读"]
+tags: ["文学解读"]
 description: ""
 draft: false
 ---
