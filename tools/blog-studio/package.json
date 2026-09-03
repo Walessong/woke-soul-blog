@@ -1,6 +1,6 @@
 {
   "name": "woke-soul-blog-studio",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "description": "Desktop editor and publisher for Woke Soul Blog",
   "main": "dist-electron/main.js",

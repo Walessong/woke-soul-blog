@@ -43,14 +43,10 @@ async function systemNpx() {
   return 'npx';
 }
 async function run(command: string, args: string[], cwd?: string) {
-  const throughCommandShell = process.platform === 'win32' && command === 'npx';
-  const executable = throughCommandShell ? (process.env.ComSpec ?? 'cmd.exe') : command;
-  const npx = throughCommandShell ? await systemNpx() : command;
-  const commandArgs = throughCommandShell
-    ? ['/d', '/s', '/c', [npx, ...args].map((value) => `"${value.replace(/"/g, '\\"')}"`).join(' ')]
-    : args;
+  const isWindowsNpx = process.platform === 'win32' && command === 'npx';
+  const executable = isWindowsNpx ? await systemNpx() : command;
   try {
-    return await execFileAsync(executable, commandArgs, { cwd, windowsHide: true, maxBuffer: 2 * 1024 * 1024, timeout: 60_000 });
+    return await execFileAsync(executable, args, { cwd, windowsHide: true, shell: isWindowsNpx, maxBuffer: 2 * 1024 * 1024, timeout: 60_000 });
   } catch (error) {
     const failure = error as Error & { stdout?: string; stderr?: string; killed?: boolean };
     const detail = [failure.killed ? '命令超时（60 秒）。' : failure.message, failure.stderr?.trim(), failure.stdout?.trim()].filter(Boolean).join('\n');
